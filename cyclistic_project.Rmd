@@ -1,0 +1,234 @@
+---
+title: "Case Study: Cyclistic Bike Share"
+author: "Aaron Tae"
+date: "5/29/2022"
+output: 
+  prettydoc::html_pretty:
+    theme: cayman
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)  
+```
+
+```{r, include=FALSE}
+library(prettydoc)  
+library(tidyverse)  
+library(lubridate)  
+```
+
+
+
+## Introduction
+
+This is the capstone project for the Google Data Analytics Certificate. 
+
+Cyclistic is a fictional bike-share company in Chicago that features more than 5,800 bicycles and 600 docking stations. 
+
+There are three types of passes customers can purchase for Cyclistic's services: single-day passes, full-day passes annual memberships.
+
+Also, Cyclisitic's customers can be divided into two main groups:
+
+1) Casual Riders - customers who purchase single-day passes and full-day passes  
+2) Cyclistic members - customers who purchase annual memberships  
+
+Cyclistic's finance analysts concluded that annual members are much more profitable than casual riders. Therefore, Cyclistic's director of marketing, Lily Moreno, believes that the key to the company's success depends on maximizing the number of annual members. 
+
+For more information on this project, [click here](https://www.coursera.org/professional-certificates/google-data-analytics).
+
+## Phase 1 - Ask  
+
+#### Goal  
+Design market strategies to convert casual riders into annual members.
+
+#### Guiding Questions  
+How do annual members and casual riders use Cyclistic bikes differently?  
+
+#### Business Task  
+Identify and analyze the differences between casual riders and annual members of Cyclistic customers in order to increase the conversion rate of casual riders into annual members. 
+
+#### Key Stakeholders  
+* Cyclistic executive team  
+* Lily Moreno - Director of Marketing and my manager  
+
+## Phase 2 - Prepare 
+
+#### Source of Data
+The data used is public data that is provided by Motivate International Inc.  
+The data is made available under [this license](https://ride.divvybikes.com/data-license-agreement).
+
+#### Data Organization
+```{r load_data, include=FALSE}
+# load all csv files
+may_2021 <- read_csv("202105.csv")  
+jun_2021 <- read_csv("202106.csv")  
+jul_2021 <- read_csv("202107-divvy-tripdata.csv")  
+aug_2021 <- read_csv("202108-divvy-tripdata.csv")  
+sep_2021 <- read_csv("202109-divvy-tripdata.csv")  
+oct_2021 <- read_csv("202110-divvy-tripdata.csv")  
+nov_2021 <- read_csv("202111-divvy-tripdata.csv")  
+dec_2021 <- read_csv("202112-divvy-tripdata.csv")  
+jan_2022 <- read_csv("202201-divvy-tripdata.csv")  
+feb_2022 <- read_csv("202202-divvy-tripdata.csv")  
+mar_2022 <- read_csv("202203-divvy-tripdata.csv")  
+apr_2022 <- read_csv("202204-divvy-tripdata.csv")  
+```
+
+The data used is original, and is collected from the last 12 months (May 2021 ~ April 2022), with a CSV files for each month.  
+
+Each CSV file has 13 variables (columns). I removed 3 variables of which I deemed unnecessary (end station name & start/end station id).
+
+The resulting data sets have 10 variables each:  
+
+* ride_id  
+* rideable_type - type of bike rented  
+* start_station_name  
+* started_at  
+* ended_at  
+* start_lat - start latitude  
+* end_lat  
+* start_lng - start longitude  
+* end_lng  
+* member_casual - member status  
+
+## Phase 3 - Process
+
+#### Data Cleaning  
+I removed both NA and duplicate values. I then created a new data set that combines all 12 CSV files by columns. 
+
+```{r}
+
+# drop unnecessary columns and also drop NA values
+drops <- c("end_station_name", "start_station_id", "end_station_id")  
+may_2021 <- drop_na(may_2021[, (!names(may_2021) %in% drops)]) %>% unique()  
+jun_2021 <- drop_na(jun_2021[, (!names(jun_2021) %in% drops)]) %>% unique()  
+jul_2021 <- drop_na(jul_2021[, (!names(jul_2021) %in% drops)]) %>% unique()  
+aug_2021 <- drop_na(aug_2021[, (!names(aug_2021) %in% drops)]) %>% unique()  
+sep_2021 <- drop_na(sep_2021[, (!names(sep_2021) %in% drops)]) %>% unique()  
+oct_2021 <- drop_na(oct_2021[, (!names(oct_2021) %in% drops)]) %>% unique()  
+nov_2021 <- drop_na(nov_2021[, (!names(nov_2021) %in% drops)]) %>% unique()  
+dec_2021 <- drop_na(dec_2021[, (!names(dec_2021) %in% drops)]) %>% unique()  
+jan_2022 <- drop_na(jan_2022[, (!names(jan_2022) %in% drops)]) %>% unique()  
+feb_2022 <- drop_na(feb_2022[, (!names(feb_2022) %in% drops)]) %>% unique()  
+mar_2022 <- drop_na(mar_2022[, (!names(mar_2022) %in% drops)]) %>% unique()  
+apr_2022 <- drop_na(apr_2022[, (!names(apr_2022) %in% drops)]) %>% unique()  
+```
+
+```{r data_merge}
+data <- rbind(may_2021,jun_2021,jul_2021,aug_2021,sep_2021,oct_2021,nov_2021,dec_2021,jan_2022,feb_2022,mar_2022,apr_2022)  
+
+## remove all other data frames to save memory
+rm(may_2021, jun_2021, jul_2021, aug_2021, sep_2021, oct_2021, nov_2021, dec_2021, jan_2022, feb_2022, mar_2022, apr_2022)
+```
+
+I then converted the 'started_at' and 'ended_at' variables to R date type variables.
+```{r}
+data$started_at <- as.POSIXct(data$started_at, format = "%Y-%m-%d %I:%M:%S %p", tz = Sys.timezone())  
+data$ended_at <- as.POSIXct(data$ended_at, format = "%Y-%m-%d %I:%M:%S %p", tz = Sys.timezone())  
+```  
+
+I then created two new variables:
+1) ride_length - the length of each ride 
+2) day_of_week - the day of the week the ride started
+```{r}
+data$ride_length <- difftime(data$ended_at, data$started_at, units='mins')  
+data$day_of_week <- format(data$started_at, "%A")
+```
+
+I then removed the rows with a negative or zero value for the ride_length variable.
+```{r}
+data <- data[data$ride_length > 0, ]
+```
+
+I also created a ordered factor column that tells what day of the week the ride took place.
+```{r, results='hide'}
+data$day_of_week <- ordered(format(data$started_at, "%A"), levels=c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+```
+## Phase 4 - Analysis
+
+#### Decriptive Analysis
+Descriptive statistics on ride_length variable:
+```{r}
+mean(data$ride_length)  
+median(data$ride_length)  
+max(data$ride_length)  
+min(data$ride_length)  
+```
+
+I compared the same statistics between members vs casual riders.
+```{r}
+aggregate(data$ride_length~data$member_casual, FUN = mean)  
+aggregate(data$ride_length~data$member_casual, FUN = median)  
+aggregate(data$ride_length~data$member_casual, FUN = max)  
+aggregate(data$ride_length~data$member_casual, FUN = min)  
+```
+
+I then looked at the top five start stations that had the most number of rides by rider type.
+```{r}
+temp_df <- data %>% 
+  group_by(start_station_name) %>% 
+  summarize(number_of_rides=n(), casual_riders=sum(member_casual == "casual"), members = sum(member_casual == "member")) %>% 
+  arrange(-number_of_rides) %>% 
+  head(5)
+
+write.csv(temp_df, file="~/Desktop/google_data_course/tableaedata.csv") # export file to create Tableau visualization
+```
+Then, I looked at the number of riders for each type of bike.
+```{r}
+temp_df2 <- data %>% 
+  group_by(rideable_type) %>% 
+  summarize(number_of_rides=n(), casual_riders=sum(member_casual == "casual"), members = sum(member_casual == "member")) %>% 
+  arrange(-number_of_rides) %>% 
+  head(5)  
+
+write.csv(temp_df2, file="~/Desktop/google_data_course/tableaudata2.csv")
+```
+
+I then analyzed the data by ride type and the day of the week.
+```{r}
+data %>% 
+  mutate(weekday = wday(started_at, label=TRUE)) %>% 
+  group_by(member_casual, weekday) %>% 
+  summarize(number_of_rides = n(), average_duration=mean(ride_length)) %>% 
+  arrange(member_casual, weekday)
+```
+
+I then created a visualization for this analysis. 
+```{r}
+# graphic produced in Tableau
+knitr::include_graphics("top5graph.png")
+```
+```{r}
+# graphic produced in Tableau
+knitr::include_graphics("biketype.png")
+```
+
+```{r, echo=FALSE}
+data %>% 
+  mutate(weekday = wday(started_at, label=TRUE)) %>% 
+  group_by(member_casual, weekday) %>% 
+  summarize(number_of_rides = n(), average_duration=mean(ride_length)) %>% 
+  arrange(member_casual, weekday) %>% 
+  ggplot(aes(x=weekday, y=number_of_rides, fill=member_casual)) +
+  geom_col(position="dodge") +
+  labs(x="Day of Week", y="Number of Rides", title = "Total Number of Rides for each Rider Type by Day of the Week", fill = "Rider Type") +
+  scale_y_continuous(labels=scales::comma, breaks=scales::pretty_breaks(n=7))
+```
+
+## Phase 5 - Share
+#### Graph 1 - Top Five Start Stations by Rider Type
+We can observe from the first graph that although there are more members than casual riders than Clark St. & Elm St. and Wells St. & Concord Ln., there are more casual riders than members for the other three top start stations, especially Streeter Dr. & Grand Avenue. A quick search reveals that these three start stations are located in areas that would be expected to be tourist attractions or local "hangout" areas. For example, Millenium Park is a famous tourist attraction in Chicago, and Streeter Dr. & Grand Avenue is located by the Navy Pier, which is another famous attraction. This tells us that areas that have more attractions are more likely to have a higher proportion of casual riders, while regular, busy streets are more likely to have a higher proportion of Cyclisitic members.
+
+#### Graph 2 - Number of Rides by Type of Bike
+We can instantly observe from the second graph that the Docked Bikes attract only casual members; no members ride the Docked Bikes at all. We can also notice that the most popular type of bike is the Classic Bike, which also has a greater proportion of members compared to Electric Bikes. Another point worth mentioning is that the rider type distribution is about even for Electric Bikes.
+
+#### Graph 3 - Total Number of Rides for each Rider Type by Day of Week
+A trend we can recognize is how while the number of rides increases for casual riders increase during the weekends, the number of rides actually increases during the middle of the week for members. We can observe that there are significant increases in numbers during Saturday and Sunday compared to weekdays. On the other hand, the numbers stay relatively consistent for members, with slight increases during the midweek. We can attribute this trend to the underlying reasons why a casual rider or a member might rent out a bike. Firstly, a casual rider will most likely rent out bikes when partaking in outdoor activities with family and/or friends over the weekends when people are off work. However, members are more likely to use bikes as a method of transportation to get to work, which explains why someone would become a Cyclistic member to begin with.
+
+## Phase 6 - Act
+#### Recommendations
+With the analysis and visualizations that I have produced, I came up with three recommendations for Cyclistic that can be given to stakeholders:
+
+1) Cyclistic's marketing campaign should not target stations with high casual rider proportions. Such areas are most likely tourist attractions, which makes it improbable that riders in these areas will convert into members. Instead, Cyclistic should focus on areas with already high proportions of Cyclistic members, to convince non-members to consider becoming a member to use Cyclistic bikes as a consistent method of transportation.  
+2) Cyclistic should concentrate the disturbution of bike types into Classic and Electric Bikes. Since no Cyclistic members rent Docked Bikes, we know that members make the active choice of not opting for these bikes. Thus, it would be much more cost efficient to instead distribute other bikes, especially Classic bikes, which has the highest number of users.  
+3) A new membership model can be developed to take into account the significant rise in number of rides by casual riders during weekends. A new member subscription model that is based on weekend usage will be much more appealing to casual riders.
